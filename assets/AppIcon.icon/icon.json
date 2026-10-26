@@ -1,0 +1,28 @@
+{
+  "fill": {
+    "solid": "srgb:0.07843,0.14902,0.22745,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "waveform.png",
+          "name": "waveform"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

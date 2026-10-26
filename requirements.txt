@@ -1,0 +1,3 @@
+numpy==2.5.3
+soxr==1.1.0
+ai-edge-litert==2.2.0

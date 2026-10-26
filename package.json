@@ -1,0 +1,95 @@
+{
+  "name": "stf-am-gui",
+  "productName": "CROW",
+  "version": "0.1.0",
+  "description": "GUI for Seattle soundscape monitoring device flashing and analysis",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:analyzer": "pyinstaller --noconfirm --onedir --copy-metadata soxr --copy-metadata ai-edge-litert --name analyzer --distpath build/analyzer --workpath build/pyinstaller --specpath build analyze.py",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "audiomoth-hid": "2.3.0",
+    "serialport": "13.0.0"
+  },
+  "devDependencies": {
+    "electron": "44.4.3",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "org.stf.audiomoth",
+    "icon": "assets/icon.png",
+    "files": [
+      "main.js",
+      "index.html",
+      "assets/icon.png",
+      ".env",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/audiomoth-hid/bin/**"
+    ],
+    "publish": null,
+    "npmRebuild": false,
+    "mac": {
+      "target": {
+        "target": "dmg",
+        "arch": "universal"
+      },
+      "identity": "-",
+      "hardenedRuntime": false,
+      "extraResources": [
+        {
+          "from": "bin/macos",
+          "to": "bin"
+        },
+        {
+          "from": "build/analyzer/analyzer",
+          "to": "analyzer"
+        },
+        {
+          "from": "models",
+          "to": "models"
+        }
+      ],
+      "x64ArchFiles": "Contents/Resources/analyzer/**",
+      "icon": "assets/AppIcon.icon"
+    },
+    "win": {
+      "target": "portable",
+      "extraResources": [
+        {
+          "from": "bin/windows",
+          "to": "bin"
+        },
+        {
+          "from": "build/analyzer/analyzer",
+          "to": "analyzer"
+        },
+        {
+          "from": "models",
+          "to": "models"
+        }
+      ]
+    },
+    "linux": {
+      "target": "AppImage",
+      "extraResources": [
+        {
+          "from": "bin/linux",
+          "to": "bin"
+        },
+        {
+          "from": "build/analyzer/analyzer",
+          "to": "analyzer"
+        },
+        {
+          "from": "models",
+          "to": "models"
+        }
+      ]
+    }
+  }
+}

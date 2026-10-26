@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' file:; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>CROW</title>
+<style>
+    :root {
+        --sidebar-bg: #1f2a33;
+        --sidebar-fg: #c9d3db;
+        --sidebar-active-bg: #2f3e4a;
+        --content-bg: #f5f6f7;
+        --text: #1f2a33;
+        --muted: #5b6770;
+        --accent: #2b6cb0;
+        --success: #1e7b34;
+        --error: #b3261e;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, sans-serif;
+        color: var(--text);
+        background: var(--content-bg);
+        user-select: none;
+    }
+    nav {
+        display: flex;
+        flex-direction: column;
+        width: 190px;
+        flex-shrink: 0;
+        background: var(--sidebar-bg);
+        color: var(--sidebar-fg);
+    }
+    nav h1 { margin: 0; padding: 20px 18px; font-size: 22px; line-height: 1.2; color: #fff; }
+    h1 small { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--sidebar-fg); }
+    nav button {
+        display: block;
+        width: 100%;
+        padding: 10px 18px;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        font-size: 15px;
+        text-align: left;
+        cursor: pointer;
+    }
+    nav button:hover { background: var(--sidebar-active-bg); }
+    nav button.active { background: var(--sidebar-active-bg); color: #fff; }
+    #account { margin-top: auto; padding: 14px 18px; font-size: 13px; word-break: break-word; }
+    #account button { padding: 4px 0; font-size: 13px; text-decoration: underline; }
+    #account button:hover { background: none; color: #fff; }
+    #login {
+        position: fixed;
+        inset: 0;
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: var(--sidebar-bg);
+        color: var(--sidebar-fg);
+    }
+    #login.hidden { display: none; }
+    #login img { width: 120px; height: 120px; }
+    #login h1 { margin: 14px 0 20px; font-size: 28px; color: #fff; text-align: center; }
+    #login h1 small { font-size: 14px; }
+    #login form { width: 280px; }
+    #login label { color: var(--sidebar-fg); }
+    #login input { width: 100%; }
+    #login .primary { width: 100%; margin-top: 4px; }
+    #login-status { min-height: 21px; margin: 12px 0 0; color: #ff9a92; text-align: center; user-select: text; }
+    main { flex: 1; padding: 28px 32px; overflow-y: auto; }
+    section { display: none; max-width: 520px; }
+    section.active { display: block; }
+    h2 { margin: 0 0 6px; font-size: 22px; }
+    .muted { color: var(--muted); margin: 0 0 16px; }
+    table { border-collapse: collapse; margin-bottom: 22px; }
+    td { padding: 1px 24px 1px 0; }
+    td:first-child { color: var(--muted); }
+    .primary {
+        padding: 9px 22px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .primary:disabled { opacity: 0.5; cursor: default; }
+    .secondary {
+        padding: 6px 14px;
+        border: 1px solid #c3ccd3;
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+    }
+    label { display: block; margin-bottom: 14px; color: var(--muted); }
+    input, select {
+        display: block;
+        width: 260px;
+        margin-top: 4px;
+        padding: 6px 8px;
+        border: 1px solid #c3ccd3;
+        border-radius: 6px;
+        background: #fff;
+        font: inherit;
+        color: var(--text);
+    }
+    #recordings-path, #output-path { margin-left: 10px; color: var(--muted); word-break: break-all; user-select: text; }
+    #show-folder { display: none; margin-top: 10px; }
+    progress { display: none; width: 320px; margin-top: 16px; }
+    .step { margin-bottom: 18px; }
+    progress.running { display: block; }
+    .status { margin-top: 16px; user-select: text; }
+    .status.success { color: var(--success); }
+    .status.error { color: var(--error); }
+</style>
+</head>
+<body>
+<div id="login">
+    <img src="assets/icon.png" alt="">
+    <h1>CROW<small>Community Recording Online Workflow App</small></h1>
+    <form id="login-form">
+        <label>Email
+            <input type="email" id="email" autocomplete="username" spellcheck="false" required>
+        </label>
+        <label>Password
+            <input type="password" id="password" autocomplete="current-password" required>
+        </label>
+        <button id="login-button" class="primary">Sign in</button>
+    </form>
+    <p id="login-status"></p>
+</div>
+<nav>
+    <h1>CROW<small>Community Recording Online Workflow App</small></h1>
+    <button class="active" data-tab="flash">Flash AudioMoth</button>
+    <button data-tab="analyze">Analyze Data</button>
+    <button data-tab="help">Help</button>
+    <div id="account">
+        <div id="account-name"></div>
+        <button id="logout-button">Sign out</button>
+    </div>
+</nav>
+<main>
+    <section id="flash" class="active">
+        <h2>Flash AudioMoth</h2>
+        <p class="muted">Connect your AudioMoth by USB (switch on USB/OFF), then press the button.</p>
+        <table>
+            <tr><td>Sample rate</td><td>192 kHz</td></tr>
+            <tr><td>Gain</td><td>Medium</td></tr>
+            <tr><td>Sleep / record</td><td>10 min / 50 min</td></tr>
+            <tr><td>LED</td><td>On</td></tr>
+            <tr><td>Battery level</td><td>On</td></tr>
+            <tr><td>Schedule</td><td>24 hours (UTC)</td></tr>
+        </table>
+        <button id="flash-button" class="primary">Flash AudioMoth</button>
+        <progress></progress>
+        <p id="status" class="status"></p>
+    </section>
+    <section id="analyze">
+        <h2>Analyze Data</h2>
+        <p class="muted">Bird and bat detection using BirdNET and BattyBirdNET.</p>
+        <div class="step">
+            <button id="choose-recordings" class="secondary">Choose recordings folder</button>
+            <span id="recordings-path">AudioMoth SD card</span>
+        </div>
+        <div class="step">
+            <button id="choose-output" class="secondary">Choose save folder</button>
+            <span id="output-path"></span>
+        </div>
+        <label>Location
+            <select id="location"></select>
+        </label>
+        <label>AudioMoth
+            <select id="device"></select>
+        </label>
+        <button id="analyze-button" class="primary" disabled>Analyze</button>
+        <progress id="analyze-progress" max="1" value="0"></progress>
+        <p id="analyze-status" class="status"></p>
+        <button id="show-folder" class="secondary">Show upload folder</button>
+    </section>
+    <section id="help"><h2>Help</h2></section>
+</main>
+<script>
+    const { ipcRenderer } = require('electron');
+
+    /* Sign in */
+
+    const login = document.getElementById('login');
+    const loginForm = document.getElementById('login-form');
+    const loginButton = document.getElementById('login-button');
+    const loginStatus = document.getElementById('login-status');
+    const passwordInput = document.getElementById('password');
+    const accountName = document.getElementById('account-name');
+    const logoutButton = document.getElementById('logout-button');
+
+    async function portal (channel, ...args) {
+        const result = await ipcRenderer.invoke(channel, ...args);
+        if (result && result.signedOut) showLogin(result.error);
+        return result;
+    }
+
+    function showLogin (message) {
+        login.classList.remove('hidden');
+        loginStatus.textContent = message || '';
+        loginButton.disabled = false;
+        passwordInput.value = '';
+    }
+
+    function signedIn (user) {
+        accountName.textContent = 'Signed in as ' + (user.name || user.email);
+        loginStatus.textContent = '';
+        login.classList.add('hidden');
+        loadLocations();
+    }
+
+    loginForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        loginButton.disabled = true;
+        loginStatus.textContent = 'Signing in...';
+        const result = await portal('login', { email: document.getElementById('email').value.trim(), password: passwordInput.value });
+        if (result.user) signedIn(result.user);
+        else showLogin(result.error);
+    });
+
+    logoutButton.addEventListener('click', async () => {
+        if (analyzing) return;
+        await portal('logout');
+        showLogin();
+    });
+
+
+    for (const tab of document.querySelectorAll('nav button')) {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.active').forEach((el) => el.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById(tab.dataset.tab).classList.add('active');
+        });
+    }
+
+    const flashButton = document.getElementById('flash-button');
+    const progress = document.querySelector('#flash progress');
+    const status = document.getElementById('status');
+
+    ipcRenderer.on('flash-progress', (_event, text) => { status.textContent = text; });
+
+    flashButton.addEventListener('click', async () => {
+        flashButton.disabled = true;
+        progress.classList.add('running');
+        status.className = 'status';
+        status.textContent = 'Starting...';
+
+        const result = await ipcRenderer.invoke('flash');
+
+        status.textContent = result.message;
+        status.className = result.ok ? 'status success' : 'status error';
+        progress.classList.remove('running');
+        flashButton.disabled = false;
+    });
+
+    /* Analyze Data */
+
+    const chooseButton = document.getElementById('choose-recordings');
+    const recordingsPath = document.getElementById('recordings-path');
+    const chooseOutputButton = document.getElementById('choose-output');
+    const outputPath = document.getElementById('output-path');
+    const locationSelect = document.getElementById('location');
+    const deviceSelect = document.getElementById('device');
+    const analyzeButton = document.getElementById('analyze-button');
+    const analyzeProgress = document.getElementById('analyze-progress');
+    const analyzeStatus = document.getElementById('analyze-status');
+    const showFolderButton = document.getElementById('show-folder');
+
+    let recordingsFolder = null;
+    let resultsFolder = null;
+    let analyzing = false;
+
+    function fillSelect (select, items, prompt) {
+        select.replaceChildren(new Option(prompt, ''));
+        for (const item of items) {
+            const option = new Option(item.name, item.id);
+            option.item = item;
+            select.add(option);
+        }
+        select.disabled = items.length === 0;
+    }
+
+    function selected (select) {
+        return select.selectedOptions[0] && select.selectedOptions[0].item;
+    }
+
+    function setAnalyzeMessage (text, isError) {
+        analyzeStatus.className = isError ? 'status error' : 'status';
+        analyzeStatus.textContent = text;
+    }
+
+    function updateAnalyzeButton () {
+        if (!analyzing) analyzeButton.disabled = !recordingsFolder || !selected(locationSelect) || !selected(deviceSelect);
+    }
+
+    async function loadLocations () {
+        fillSelect(locationSelect, [], 'Loading...');
+        fillSelect(deviceSelect, [], 'Choose a location first');
+        updateAnalyzeButton();
+        const locations = await portal('locations');
+        if (locations.error) {
+            fillSelect(locationSelect, [], 'Not available');
+            if (!locations.signedOut) setAnalyzeMessage(locations.error, true);
+            return;
+        }
+        fillSelect(locationSelect, locations, locations.length ? 'Choose a location' : 'None checked out to you');
+        if (locations.length === 0) setAnalyzeMessage('No AudioMoths currently checked out.', true);
+        else if (analyzeStatus.className === 'status error') setAnalyzeMessage('');
+        if (locations.length === 1) {
+            locationSelect.selectedIndex = 1;
+            loadAudioMoths();
+        }
+    }
+
+    async function loadAudioMoths () {
+        const location = selected(locationSelect);
+        fillSelect(deviceSelect, [], location ? 'Loading...' : 'Choose a location first');
+        updateAnalyzeButton();
+        if (!location) return;
+        const audiomoths = await portal('audiomoths', location.id);
+        if (selected(locationSelect) !== location) return;
+        if (audiomoths.error) {
+            fillSelect(deviceSelect, [], 'Not available');
+            if (!audiomoths.signedOut) setAnalyzeMessage(audiomoths.error, true);
+            return;
+        }
+        fillSelect(deviceSelect, audiomoths, audiomoths.length ? 'Choose an AudioMoth' : 'None at this location');
+        if (audiomoths.length === 1) deviceSelect.selectedIndex = 1;
+        updateAnalyzeButton();
+    }
+
+    locationSelect.addEventListener('change', loadAudioMoths);
+    deviceSelect.addEventListener('change', updateAnalyzeButton);
+
+    let outputFolder = null;
+
+    function setOutputFolder (folder) {
+        outputFolder = folder;
+        outputPath.textContent = folder;
+    }
+
+    ipcRenderer.invoke('output-folder').then(setOutputFolder);
+
+    chooseOutputButton.addEventListener('click', async () => {
+        const folder = await ipcRenderer.invoke('choose-output');
+        if (folder) setOutputFolder(folder);
+    });
+
+    chooseButton.addEventListener('click', async () => {
+        const folder = await ipcRenderer.invoke('choose-recordings');
+        if (!folder) return;
+        recordingsFolder = folder;
+        recordingsPath.textContent = folder;
+        updateAnalyzeButton();
+    });
+
+    ipcRenderer.on('analysis-progress', (_event, message) => {
+        analyzeProgress.value = message.fraction;
+        analyzeStatus.textContent = message.message;
+    });
+
+    analyzeButton.addEventListener('click', async () => {
+        if (analyzing) {
+            ipcRenderer.invoke('cancel-analysis');
+            return;
+        }
+
+        analyzing = true;
+        for (const control of [chooseButton, chooseOutputButton, locationSelect, deviceSelect, logoutButton]) control.disabled = true;
+        analyzeButton.textContent = 'Cancel';
+        analyzeProgress.value = 0;
+        analyzeProgress.classList.add('running');
+        analyzeStatus.className = 'status';
+        analyzeStatus.textContent = 'Starting...';
+        showFolderButton.style.display = 'none';
+
+        const result = await ipcRenderer.invoke('analyze', {
+            folder: recordingsFolder,
+            output: outputFolder,
+            location: selected(locationSelect),
+            device: selected(deviceSelect)
+        });
+
+        analyzing = false;
+        for (const control of [chooseButton, chooseOutputButton, locationSelect, deviceSelect, logoutButton]) control.disabled = false;
+        analyzeButton.textContent = 'Analyze';
+        analyzeProgress.classList.remove('running');
+        analyzeStatus.textContent = result.message;
+        analyzeStatus.className = result.ok ? 'status success' : 'status error';
+        resultsFolder = result.ok ? result.path : null;
+        showFolderButton.style.display = result.ok ? 'block' : 'none';
+    });
+
+    showFolderButton.addEventListener('click', () => ipcRenderer.invoke('show-folder', resultsFolder));
+</script>
+</body>
+</html>
