@@ -8,6 +8,7 @@ import platform
 import re
 import shutil
 import sys
+import tempfile
 import wave
 from collections import defaultdict
 
@@ -49,6 +50,7 @@ DEVICE_PATTERN = re.compile(r"by AudioMoth ([0-9A-F]{16})")
 GAIN_PATTERN = re.compile(r"at ([a-z-]+) gain")
 BATTERY_PATTERN = re.compile(r"battery was (less than |greater than )?(\d+\.\d+)V")
 TEMPERATURE_PATTERN = re.compile(r"temperature was (-?\d+\.\d+)C")
+STOP_PATTERN = re.compile(r"[Rr]ecording (?:stopped|cancelled)[^.]*? due to ([^.]+)")
 
 
 def emit(**message):
@@ -189,17 +191,45 @@ class Chunker:
             yield self.position / self.rate, noise_padding(self.buffer, CHUNK_SAMPLES - len(self.buffer), self.rng)
 
 
-class Results:
-    def __init__(self):
-        self.hours = defaultdict(dict)
+SCORE_SCALE = 10000
+EPOCH = datetime.datetime(1970, 1, 1)
+SCORE_TEXT = np.array([f"{i / SCORE_SCALE:.4f}".rstrip("0").rstrip(".") for i in range(SCORE_SCALE + 1)])
 
-    def add(self, folder, time, label, confidence):
-        hour = self.hours[(folder, time.date(), time.hour)]
-        if label not in hour:
-            hour[label] = (np.zeros(60, dtype="uint16"), np.zeros(60, dtype="float32"))
-        counts, max_confidence = hour[label]
-        counts[time.minute] += 1
-        max_confidence[time.minute] = max(max_confidence[time.minute], confidence)
+
+class SkipError(Exception):
+    pass
+
+
+class Results:
+    def __init__(self, parts_dir):
+        self.parts_dir = parts_dir
+        self.labels = {}
+        self.counts = {}
+        self.parts = defaultdict(list)
+        self.pending = defaultdict(list)
+
+    def add(self, folder, labels, times, scores, detected):
+        self.labels[folder] = labels
+        quantized = np.rint(scores * SCORE_SCALE).astype("uint16")
+        for row, time in enumerate(times):
+            self.pending[(folder, time.date(), time.hour)].append((time, quantized[row], detected[row]))
+
+    def flush(self):
+        for key, rows in self.pending.items():
+            if key not in self.counts:
+                self.counts[key] = np.zeros(len(self.labels[key[0]]), dtype="int64")
+            self.counts[key] += np.sum([d for _, _, d in rows], axis=0)
+            part = os.path.join(self.parts_dir, f"{len(self.parts[key])}_{key[0]}_{key[1]}_{key[2]:02d}.npz")
+            np.savez(part, times=np.array([(t - EPOCH).total_seconds() for t, _, _ in rows]), scores=np.stack([r for _, r, _ in rows]))
+            self.parts[key].append(part)
+        self.pending.clear()
+
+    def hour(self, key):
+        loaded = [np.load(part) for part in self.parts[key]]
+        times = np.concatenate([p["times"] for p in loaded])
+        scores = np.concatenate([p["scores"] for p in loaded])
+        order = np.argsort(times, kind="stable")
+        return times[order], scores[order]
 
 
 def score_batch(models, kind, batch, results, file_start, week):
@@ -214,15 +244,14 @@ def score_batch(models, kind, batch, results, file_start, week):
         scores = models.bat_scores(samples)
         detected = (scores >= BAT_MIN_CONFIDENCE) & models.bat_species
         labels, folder = models.bat_labels, BAT_MODEL_FOLDER
-    for row, column in zip(*np.nonzero(detected)):
-        time = file_start + datetime.timedelta(seconds=starts[row])
-        results.add(folder, time, labels[column], float(scores[row, column]))
+    times = [file_start + datetime.timedelta(seconds=start) for start in starts]
+    results.add(folder, labels, times, scores, detected)
 
 
 def analyze_file(models, path, file_start, results, on_progress):
     with wave.open(path, "rb") as wav:
         if wav.getsampwidth() != 2 or wav.getnchannels() != 1:
-            raise ValueError("not a 16-bit mono recording")
+            raise SkipError()
         rate, frames = wav.getframerate(), wav.getnframes()
         analyze_bats = rate >= BAT_MIN_RECORDING_RATE
         week = birdnet_week(file_start)
@@ -252,25 +281,32 @@ def analyze_file(models, path, file_start, results, on_progress):
                 return frames / rate, analyze_bats
 
 
+def segment_time(seconds):
+    time = EPOCH + datetime.timedelta(seconds=seconds)
+    fraction = f"{time.microsecond / 1e6:.4f}"[1:].rstrip("0").rstrip(".")
+    return time.strftime("%Y-%m-%dT%H:%M:%S") + fraction + "Z"
+
+
 def write_outputs(results, output, location):
-    for (folder, date, hour), species in results.hours.items():
-        if not species:
-            continue
+    for key in sorted(results.counts):
+        folder, date, hour = key
         day = date.isoformat()
         directory = os.path.join(output, folder, day)
         os.makedirs(directory, exist_ok=True)
+        times, scores = results.hour(key)
+        counts = results.counts[key]
         stem = os.path.join(directory, f"{location}_{day}_{hour:02d}")
-        names = sorted(species, key=lambda label: (-int(species[label][0].sum()), label))
-        np.savez_compressed(
-            stem + ".npz",
-            species=np.array(names),
-            counts_per_minute=np.stack([species[n][0] for n in names]),
-            max_confidence_per_minute=np.stack([species[n][1] for n in names]),
-        )
-        with open(stem + ".csv", "w", encoding="utf-8", newline="") as f:
-            f.write("species,count\n")
-            for name in names:
-                f.write(f"\"{name}\",{int(species[name][0].sum())}\n")
+        labels = results.labels[folder]
+        detected = sorted(np.nonzero(counts)[0], key=lambda i: (-counts[i], labels[i]))
+        if detected:
+            with open(stem + ".csv", "w", encoding="utf-8", newline="") as f:
+                f.write("species,count\n")
+                for index in detected:
+                    f.write(f"{labels[index]},{counts[index]}\n")
+        with open(stem + "_scores.csv", "w", encoding="utf-8", newline="") as f:
+            f.write("time," + ",".join(labels) + "\n")
+            for time, row in zip(times, SCORE_TEXT[scores]):
+                f.write(segment_time(time) + "," + ",".join(row) + "\n")
 
 
 def utc(time):
@@ -301,7 +337,30 @@ def parse_comment(comment):
         "battery_v": battery and float(battery.group(2)),
         "battery_bound": battery and (battery.group(1) or "").strip().replace(" than", "") or None,
         "temperature_c": temperature and float(temperature.group(1)),
+        "stop_reason": token(stop.group(1)) if (stop := STOP_PATTERN.search(comment)) else None,
     }
+
+
+def token(text):
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+
+
+def config_value(value):
+    if value in ("", "-"):
+        return None
+    if value in ("Yes", "No"):
+        return value == "Yes"
+    if re.fullmatch(r"-?\d+", value):
+        return int(value)
+    if match := re.fullmatch(r"(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d) \(UTC\)", value):
+        return f"{match.group(1)}T{match.group(2)}Z"
+    if match := re.fullmatch(r"(\d\d:\d\d) - (\d\d:\d\d) \(UTC\)", value):
+        return {"start_utc": match.group(1), "end_utc": match.group(2)}
+    if match := re.fullmatch(r"(\S+) \((\d+(?:\.\d+)*)\)", value):
+        return {"name": match.group(1), "version": match.group(2)}
+    if re.fullmatch(r"[A-Za-z][A-Za-z -]*", value):
+        return token(value)
+    return value
 
 
 def read_card_files(folder):
@@ -315,12 +374,12 @@ def read_card_files(folder):
             if name.upper() == "CONFIG.TXT" and config is None:
                 with open(path, encoding="utf-8", errors="replace") as f:
                     text = f.read()
-                config = {}
+                config = {"file": os.path.relpath(path, folder)}
                 for line in text.splitlines():
                     key, colon, value = line.partition(":")
                     if colon and key.strip():
-                        config[key.strip()] = value.strip()
-                config = {"file": os.path.relpath(path, folder), "fields": config, "text": text}
+                        key, value = token(key), value.strip()
+                        config[key] = (value if value != "-" else None) if key.endswith("_id") else config_value(value)
             else:
                 other_files.append({"file": os.path.relpath(path, folder), "size_bytes": os.path.getsize(path)})
     return config, other_files
@@ -420,10 +479,21 @@ def write_meta(path, args, context, folder_name, recordings, first_day, last_day
         "outputs": {
             "path": "<model>/<YYYY-MM-DD>/<location>_<YYYY-MM-DD>_<HH>",
             "time_zone": "UTC",
-            "csv_columns": ["species", "count"],
-            "count_unit": "chunks",
-            "npz_arrays": {"species": "[n]", "counts_per_minute": "uint16 [n, 60]", "max_confidence_per_minute": "float32 [n, 60]"},
-            "empty_hours": "omitted",
+            "summary": {
+                "file": "<location>_<YYYY-MM-DD>_<HH>.csv",
+                "columns": ["species", "count"],
+                "count_unit": "segments",
+                "min_count": 1,
+                "sort": ["count_desc", "species_asc"],
+                "empty_hours": False,
+            },
+            "scores": {
+                "file": "<location>_<YYYY-MM-DD>_<HH>_scores.csv",
+                "columns": ["time", "<labels>"],
+                "time": "segment_start_utc",
+                "score_decimals": 4,
+                "empty_hours": True,
+            },
         },
     }
     with open(path, "w", encoding="utf-8") as f:
@@ -439,7 +509,9 @@ def make_read_only(folder):
 
 
 def unreadable_reason(path, error):
-    return "empty file" if os.path.getsize(path) == 0 else str(error) or error.__class__.__name__
+    if os.path.getsize(path) == 0:
+        return "empty_file"
+    return "not_16bit_mono" if isinstance(error, SkipError) else "unreadable"
 
 
 def main():
@@ -471,17 +543,16 @@ def main():
             "skip_reason": None,
             "bats_analyzed": False,
             **parse_comment(comment),
-            "comment": comment,
         }
         try:
             with wave.open(path, "rb") as wav:
                 if wav.getsampwidth() != 2 or wav.getnchannels() != 1:
-                    raise ValueError("not a 16-bit mono recording")
+                    raise SkipError()
                 rate = wav.getframerate()
                 duration = wav.getnframes() / rate
             record.update(duration_s=round(duration, 3), sample_rate_hz=rate, end_utc=utc(start + datetime.timedelta(seconds=duration)))
             readable.append((start, path, duration))
-        except (wave.Error, ValueError, EOFError, OSError) as e:
+        except (wave.Error, SkipError, ValueError, EOFError, OSError) as e:
             record["skip_reason"] = unreadable_reason(path, e)
 
     if not readable:
@@ -497,16 +568,19 @@ def main():
     emit(type="progress", fraction=0, message="Loading models...")
     models = Models(args.models)
 
-    results = Results()
+    parts = tempfile.TemporaryDirectory(prefix="crow-")
+    results = Results(parts.name)
     analyzed = 0
     for index, (start, path, _) in enumerate(readable):
         message = f"Analyzing recording {index + 1} of {len(readable)}..."
         report = lambda fraction: emit(type="progress", fraction=(index + fraction) / len(readable), message=message)
         try:
             _, bats_analyzed = analyze_file(models, path, start, results, report)
-        except (wave.Error, ValueError, EOFError, OSError) as e:
+        except (wave.Error, SkipError, ValueError, EOFError, OSError) as e:
+            results.pending.clear()
             records[path]["skip_reason"] = unreadable_reason(path, e)
             continue
+        results.flush()
         analyzed += 1
         records[path].update(status="analyzed", bats_analyzed=bats_analyzed)
 
@@ -516,7 +590,9 @@ def main():
     staging = destination + ".partial"
     shutil.rmtree(staging, ignore_errors=True)
     os.makedirs(staging)
+    emit(type="progress", fraction=1, message="Writing results...")
     write_outputs(results, staging, args.location)
+    parts.cleanup()
     write_meta(os.path.join(staging, "META.TXT"), args, context, folder_name, list(records.values()), first_day, last_day)
     os.rename(staging, destination)
     make_read_only(destination)
