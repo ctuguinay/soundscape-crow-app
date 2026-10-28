@@ -482,14 +482,34 @@ handlePortal('audiomoths', async (locationID) => (await portal('/audiomoths?loca
 
 // App Window
 
+let flashing = false;
+
 ipcMain.handle('flash', async (event) => {
 
+    flashing = true;
     try {
         const message = await flashAudioMoth((text) => event.sender.send('flash-progress', text));
         return { ok: true, message };
     } catch (err) {
         return { ok: false, message: err.message || String(err) };
+    } finally {
+        flashing = false;
     }
+
+});
+
+// Battery Voltage Test
+
+const BATTERY_OK_VOLTS = 4.5;
+
+ipcMain.handle('battery', async () => {
+
+    if (flashing) return null;
+    const state = await util.promisify(audiomoth.getBatteryState)().catch(() => null);
+    if (!state) return null;
+    const volts = parseFloat(state.replace(/[^\d.]/g, ''));
+    const ok = state.startsWith('>') || (!state.startsWith('<') && volts >= BATTERY_OK_VOLTS);
+    return { state, ok };
 
 });
 

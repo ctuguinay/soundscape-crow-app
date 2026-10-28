@@ -118,6 +118,10 @@
     progress { display: none; width: 320px; margin-top: 16px; }
     .step { margin-bottom: 18px; }
     progress.running { display: block; }
+    #battery { margin: 0 0 16px; }
+    #battery b { margin-left: 8px; padding: 1px 8px; border-radius: 4px; color: #fff; font-size: 12px; }
+    #battery b.ok { background: var(--success); }
+    #battery b.replace { background: var(--error); }
     .status { margin-top: 16px; user-select: text; }
     .status.success { color: var(--success); }
     .status.error { color: var(--error); }
@@ -152,6 +156,7 @@
     <section id="flash" class="active">
         <h2>Flash AudioMoth</h2>
         <p class="muted">Connect your AudioMoth by USB (switch on USB/OFF), then press the button.</p>
+        <p id="battery" class="muted">No AudioMoth connected</p>
         <table>
             <tr><td>Sample rate</td><td>192 kHz</td></tr>
             <tr><td>Gain</td><td>Medium</td></tr>
@@ -248,6 +253,21 @@
     const flashButton = document.getElementById('flash-button');
     const progress = document.querySelector('#flash progress');
     const status = document.getElementById('status');
+
+    const battery = document.getElementById('battery');
+
+    async function checkBattery () {
+        const result = await ipcRenderer.invoke('battery');
+        if (result) {
+            battery.className = '';
+            battery.innerHTML = 'Battery: ' + result.state + (result.ok ? ' <b class="ok">OK</b>' : ' <b class="replace">REPLACE</b>');
+        } else if (!flashButton.disabled) {
+            battery.className = 'muted';
+            battery.textContent = 'No AudioMoth connected';
+        }
+        setTimeout(checkBattery, 2000);
+    }
+    checkBattery();
 
     ipcRenderer.on('flash-progress', (_event, text) => { status.textContent = text; });
 

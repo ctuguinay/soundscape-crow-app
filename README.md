@@ -9,6 +9,8 @@ Sample rate: 192 kHz
 Duty cycle: 10 min / 50 min
 Schedule: 00:00-24:00
 
+You will also be able to check the current voltage of the attached batteries in the AudioMoth.
+
 ## Analyzing Data
 
 The app can analyze data from an AudioMoth SD card structure ready for upload to the webportal. You will be prompted to select a location and inventory item before, logging in and selecting the correct settings is essential to populate the META.TXT file properly. BirdNET 2.4 and BattyBirdNET 1.0 USA-WEST are used.
