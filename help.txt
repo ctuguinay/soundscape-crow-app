@@ -1,0 +1,47 @@
+Q: Why do I have to sign in every time I open the app?
+Currently, the app does not save your login on the computer. You are signed out when you close the app or press Sign out.
+
+Q: How do I connect my AudioMoth?
+Put the AudioMoth switch on USB/OFF and connect it with a USB cable.
+
+Q: The app says "No AudioMoth connected" but it is plugged in.
+Make sure the switch is on USB/OFF and try a different cable or USB port. Some cables only charge and do not carry data. Plug the AudioMoth straight into the computer instead of through a hub or dock.
+
+Q: What do OK and REPLACE mean next to the battery?
+OK means the batteries are at 4.5 V or more. REPLACE means they are lower and should be changed before you deploy the AudioMoth. If you are unsure, charge the batteries!
+
+Q: What does flashing do?
+It installs the latest AudioMoth firmware and sets the default recording settings: 192 kHz, 10 minutes sleep and 50 minutes recording, all day (24 hrs).
+
+Q: Can I unplug the AudioMoth while it is flashing?
+No. Wait until the app says it is finished. If flashing stops partway, plug the AudioMoth back in and press Flash AudioMoth again. If the AudioMoth is disconnected in the middle of flashing, a manual reset may be required. Send an support email to get help.
+
+Q: When should I flash my AudioMoth?
+Flash it right before each deployment so it has the correct settings and time.
+
+Q: Which folder do I choose for analysis?
+Choose the AudioMoth's SD card, or a folder you copied the SD card into. The app finds the recordings (.WAV files) inside it.
+
+Q: My location or AudioMoth is not in the list.
+The lists come from the online webportal and only show your checked out AudioMoths. You can add additional locations on the website. You must use the same location when uploading data and in the CROW app.
+
+Q: How long does analysis take?
+It depends on your computer and how much audio there is. A full SD card can take several hours. Keep the computer awake and plugged in.
+
+Q: Analysis says it needs a Mac with Apple silicon.
+Analysis does not work on older Intel Macs. Use a Mac with an M1 chip or newer, or a Windows or Linux computer.
+
+Q: Can I use my computer while it analyzes?
+Yes, but the analysis will go slower. You can press Cancel at any time and start again later. If analysis is particularly slow, we recommend analyzing at night when you are not using your computer.
+
+Q: Where are my results saved?
+In the save folder shown on the Analyze Data tab, which is "Documents/Soundscape Results". Press Show upload folder when it is done.
+
+Q: Why can't I edit or delete the results folder?
+The results are read-only so they stay exactly as the app made them. To delete a folder, first change its permissions in Finder or File Explorer.
+
+Q: Some recordings were skipped.
+Empty or damaged recordings are skipped. Bats are only checked in recordings made at 96 kHz or higher.
+
+Q: How do I upload my results?
+Sign in to the webportal and upload the whole results folder, with a photo taken at the deployment site.

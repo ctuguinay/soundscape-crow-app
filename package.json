@@ -24,6 +24,7 @@
     "files": [
       "main.js",
       "index.html",
+      "help.txt",
       "assets/icon.png",
       ".env",
       "package.json"

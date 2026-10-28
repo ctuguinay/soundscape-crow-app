@@ -118,6 +118,9 @@
     progress { display: none; width: 320px; margin-top: 16px; }
     .step { margin-bottom: 18px; }
     progress.running { display: block; }
+    #faq details { margin-bottom: 8px; padding: 8px 12px; border: 1px solid #c3ccd3; border-radius: 6px; background: #fff; }
+    #faq summary { font-weight: 600; cursor: pointer; }
+    #faq p { margin: 8px 0 0; user-select: text; }
     #battery { margin: 0 0 16px; }
     #battery b { margin-left: 8px; padding: 1px 8px; border-radius: 4px; color: #fff; font-size: 12px; }
     #battery b.ok { background: var(--success); }
@@ -191,10 +194,28 @@
         <p id="analyze-status" class="status"></p>
         <button id="show-folder" class="secondary">Show upload folder</button>
     </section>
-    <section id="help"><h2>Help</h2></section>
+    <section id="help">
+        <h2>Help</h2>
+        <div id="faq"></div>
+    </section>
 </main>
 <script>
     const { ipcRenderer } = require('electron');
+    const fs = require('fs');
+    const path = require('path');
+
+    const faq = document.getElementById('faq');
+    for (const entry of fs.readFileSync(path.join(__dirname, 'help.txt'), 'utf8').split(/\r?\n\s*\n/)) {
+        const [question, ...answer] = entry.trim().split(/\r?\n/);
+        if (!question.startsWith('Q:')) continue;
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        const text = document.createElement('p');
+        summary.textContent = question.slice(2).trim();
+        text.textContent = answer.join(' ');
+        details.append(summary, text);
+        faq.append(details);
+    }
 
     /* Sign in */
 
