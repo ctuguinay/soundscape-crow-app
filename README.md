@@ -9,7 +9,7 @@ Sample rate: 192 kHz
 Duty cycle: 10 min / 50 min
 Schedule: 00:00-24:00
 
-You will also be able to check the current voltage of the attached batteries in the AudioMoth.
+The voltage reading of the AudioMoth batteries will also be displayed.
 
 ## Analyzing Data
 
