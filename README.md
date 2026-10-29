@@ -1,6 +1,6 @@
 # CROW: Community Recording Online Workflow
 
-The CROW app is used for configuring AudioMoth devices and analyzing generated results from AudioMoths. See [Greater Seattle Soundsacpe Monitoring Project](https://seattle-soundscape.uw.edu) for more information about the project.
+The CROW app is used for configuring AudioMoth devices and analyzing generated results from AudioMoths. See [Greater Seattle Soundscape Monitoring Project](https://seattle-soundscape.uw.edu) for more information about the project.
 
 ## Flashing AudioMoths
 
@@ -9,7 +9,7 @@ Sample rate: 192 kHz
 Duty cycle: 10 min / 50 min
 Schedule: 00:00-24:00
 
-You will also be able to check the current voltage of the attached batteries in the AudioMoth.
+The voltage reading of the AudioMoth batteries will also be displayed.
 
 ## Analyzing Data
 
